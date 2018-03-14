@@ -109,18 +109,18 @@ function createPanZoom(domElement, options) {
     // TODO: this duplicates autocenter. I think autocenter should go.
     var w = owner.clientWidth
     var h = owner.clientHeight
+
     var rectWidth = rect.right - rect.left
     var rectHeight = rect.bottom - rect.top
-    if (!Number.isFinite(rectWidth) || !Number.isFinite(rectHeight)) {
-      throw new Error('Invalid rectangle');
-    }
-
     var dh = h/rectHeight
     var dw = w/rectWidth
     var scale = Math.min(dw, dh)
-    transform.x = -(rect.left + rectWidth/2) * scale + w/2
-    transform.y = -(rect.top + rectHeight/2) * scale + h/2
-    transform.scale = scale
+    
+    transform.x = w/2 - rectWidth / 2 * scale;
+    transform.y = h/2 - rectHeight / 2 * scale;
+
+    transform.scale = transform.scale || 1;
+    transform.scale *= scale
   }
 
   function autocenter() {
@@ -283,7 +283,6 @@ function createPanZoom(domElement, options) {
     var parentOffsetY = 0
 
     if (domController.getScreenCTM) {
-      // TODO: This is likely need to be done for all mouse/touch events.
       var parentCTM = domController.getScreenCTM()
       parentScaleX = parentCTM.a
       parentScaleY = parentCTM.b
@@ -538,7 +537,8 @@ function createPanZoom(domElement, options) {
   }
 
   function onDoubleClick(e) {
-    smoothZoom(e.clientX, e.clientY, zoomDoubleClickSpeed)
+    const { left, top } = owner.getBoundingClientRect();
+    smoothZoom(e.clientX - left, e.clientY - top, zoomDoubleClickSpeed)
 
     e.preventDefault()
     e.stopPropagation()
@@ -613,7 +613,12 @@ function createPanZoom(domElement, options) {
     var scaleMultiplier = getScaleMultiplier(e.deltaY)
 
     if (scaleMultiplier !== 1) {
-      publicZoomTo(e.clientX, e.clientY, scaleMultiplier)
+      const { left, top } = owner.getBoundingClientRect();
+      publicZoomTo(
+        e.clientX - left,
+        e.clientY - top,
+        scaleMultiplier
+      );
       e.preventDefault()
     }
   }
