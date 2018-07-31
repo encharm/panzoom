@@ -42,6 +42,10 @@ function createPanZoom(domElement, options) {
     throw new Error('Cannot create panzoom for the current type of dom element')
   }
   var owner = domController.getOwner()
+  // just to avoid GC pressure, every time we do intermediate transform
+  // we return this object. For internal use only. Never give it back to the consumer of this library
+  var storedCTMResult = {x: 0, y: 0}
+
 
   var isDirty = false
   var transform = new Transform()
@@ -107,20 +111,46 @@ function createPanZoom(domElement, options) {
 
   function showRectangle(rect) {
     // TODO: this duplicates autocenter. I think autocenter should go.
-    var w = owner.clientWidth
-    var h = owner.clientHeight
+    var size = transformToScreen(owner.clientWidth, owner.clientHeight)
+
+    const { x: ownerX, y: ownerY } = owner.getBoundingClientRect();
+    rect.left -= ownerX;
+    rect.right -= ownerX;
+    rect.top -= ownerY;
+    rect.bottom -= ownerY;
 
     var rectWidth = rect.right - rect.left
     var rectHeight = rect.bottom - rect.top
-    var dh = h/rectHeight
-    var dw = w/rectWidth
-    var scale = Math.min(dw, dh)
-    
-    transform.x = w/2 - rectWidth / 2 * scale;
-    transform.y = h/2 - rectHeight / 2 * scale;
+    if (!Number.isFinite(rectWidth) || !Number.isFinite(rectHeight)) {
+      throw new Error('Invalid rectangle');
+    }
 
+    var dw = size.x/rectWidth
+    var dh = size.y/rectHeight
+    var scale = Math.min(dw, dh)
+
+    transform.x = transform.x - rect.left + size.x/2 - rectWidth / 2 * scale;
+    transform.y = transform.y - rect.top + size.y/2 - rectHeight / 2 * scale;
+    
     transform.scale = transform.scale || 1;
     transform.scale *= scale
+  }
+
+  function transformToScreen(x, y) {
+    if (domController.getScreenCTM) {
+      var parentCTM = domController.getScreenCTM()
+      var parentScaleX = parentCTM.a
+      var parentScaleY = parentCTM.d
+      var parentOffsetX = parentCTM.e
+      var parentOffsetY = parentCTM.f
+      storedCTMResult.x = x * parentScaleX - parentOffsetX
+      storedCTMResult.y = y * parentScaleY - parentOffsetY
+    } else {
+      storedCTMResult.x = x
+      storedCTMResult.y = y
+    }
+
+    return storedCTMResult
   }
 
   function autocenter() {
