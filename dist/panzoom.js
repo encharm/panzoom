@@ -1,4 +1,4 @@
-(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.panzoom = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.panzoom = f()}})(function(){var define,module,exports;return (function(){function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s}return e})()({1:[function(require,module,exports){
 /* globals SVGElement */
 /**
  * Allows to drag and zoom svg elements
@@ -7,7 +7,7 @@ var wheel = require('wheel')
 var animate = require('amator');
 var kinetic = require('./lib/kinetic.js')
 var createEvent = require('./lib/createEvent.js')
-var preventTextSelection = require('./lib/textSlectionInterceptor.js')()
+var preventTextSelection = require('./lib/textSelectionInterceptor.js')()
 var Transform = require('./lib/transform.js');
 var makeSvgController = require('./lib/svgController.js')
 var makeDomController = require('./lib/domController.js')
@@ -20,7 +20,7 @@ module.exports = createPanZoom
 
 /**
  * Creates a new instance of panzoom, so that an object can be panned and zoomed
- * 
+ *
  * @param {DOMElement} domElement where panzoom should be attached.
  * @param {Object} options that configure behavior.
  */
@@ -46,6 +46,10 @@ function createPanZoom(domElement, options) {
 
   var isDirty = false
   var transform = new Transform()
+
+  if (domController.initTransform) {
+    domController.initTransform(transform)
+  }
 
   var realPinch = typeof options.realPinch === 'boolean' ? options.realPinch : false
   var bounds = options.bounds
@@ -81,7 +85,7 @@ function createPanZoom(domElement, options) {
   var smoothScroll
   if ('smoothScroll' in options && !options.smoothScroll) {
     // If user explicitly asked us not to use smooth scrolling, we obey
-    smoothScroll = rigidScroll() 
+    smoothScroll = rigidScroll()
   } else {
     // otherwise we use forward smoothScroll settings to kinetic API
     // which makes scroll smoothing.
@@ -112,6 +116,10 @@ function createPanZoom(domElement, options) {
     var h = owner.clientHeight
     var rectWidth = rect.right - rect.left
     var rectHeight = rect.bottom - rect.top
+    if (!Number.isFinite(rectWidth) || !Number.isFinite(rectHeight)) {
+      throw new Error('Invalid rectangle');
+    }
+
     var dh = h/rectHeight
     var dw = w/rectWidth
     var scale = Math.min(dw, dh)
@@ -138,6 +146,11 @@ function createPanZoom(domElement, options) {
       h = owner.clientHeight
     }
     var bbox = domController.getBBox()
+    if (bbox.width === 0 || bbox.height === 0) {
+      // we probably do not have any elements in the SVG
+      // just bail out;
+      return;
+    }
     var dh = h/bbox.height
     var dw = w/bbox.width
     var scale = Math.min(dw, dh)
@@ -274,19 +287,22 @@ function createPanZoom(domElement, options) {
       ratio = maxZoom / transform.scale
     }
 
-    var parentScale = 1
+    var parentScaleX = 1
+    var parentScaleY = 1
     var parentOffsetX = 0
     var parentOffsetY = 0
 
     if (domController.getScreenCTM) {
+      // TODO: This is likely need to be done for all mouse/touch events.
       var parentCTM = domController.getScreenCTM()
-      parentScale = parentCTM.a
+      parentScaleX = parentCTM.a
+      parentScaleY = parentCTM.d
       parentOffsetX = parentCTM.e
       parentOffsetY = parentCTM.f
     }
 
-    var x = clientX * parentScale - parentOffsetX
-    var y = clientY * parentScale - parentOffsetY
+    var x = clientX * parentScaleX - parentOffsetX
+    var y = clientY * parentScaleY - parentOffsetY
 
     transform.x = x - ratio * (x - transform.x)
     transform.y = y - ratio * (y - transform.y)
@@ -347,7 +363,7 @@ function createPanZoom(domElement, options) {
   }
 
   function dispose() {
-    wheel.removeWheelListener(domElement, onMouseWheel)
+    wheel.removeWheelListener(owner, onMouseWheel)
     owner.removeEventListener('mousedown', onMouseDown)
     owner.removeEventListener('keydown', onKeyDown)
     owner.removeEventListener('dblclick', onDoubleClick)
@@ -369,6 +385,9 @@ function createPanZoom(domElement, options) {
     owner.addEventListener('dblclick', onDoubleClick)
     owner.addEventListener('touchstart', onTouch)
     owner.addEventListener('keydown', onKeyDown)
+
+    // Need to listen on the owner container, so that we are not limited
+    // by the size of the scrollable domElement
     wheel.addWheelListener(owner, onMouseWheel)
 
     makeDirty()
@@ -427,23 +446,29 @@ function createPanZoom(domElement, options) {
   }
 
   function onTouch(e) {
+    beforeTouch(e);
     if (e.touches.length === 1) {
       return handleSingleFingerTouch(e, e.touches[0])
     } else if (e.touches.length === 2) {
       // handleTouchMove() will care about pinch zoom.
-      e.stopPropagation()
-      e.preventDefault()
-
       pinchZoomLength = getPinchZoomLength(e.touches[0], e.touches[1])
       multitouch  = true
       startTouchListenerIfNeeded()
     }
   }
 
-  function handleSingleFingerTouch(e) {
+  function beforeTouch(e) {
+    if (options.onTouch && !options.onTouch(e)) {
+      // if they return `false` from onTouch, we don't want to stop
+      // events propagation. Fixes https://github.com/anvaka/panzoom/issues/12
+      return
+    }
+
     e.stopPropagation()
     e.preventDefault()
+  }
 
+  function handleSingleFingerTouch(e) {
     var touch = e.touches[0]
     mouseX = touch.clientX
     mouseY = touch.clientY
@@ -709,7 +734,8 @@ function rigidScroll() {
     cancel: noop
   }
 }
-},{"./lib/createEvent.js":2,"./lib/domController.js":3,"./lib/kinetic.js":4,"./lib/svgController.js":5,"./lib/textSlectionInterceptor.js":6,"./lib/transform.js":7,"amator":8,"wheel":10}],2:[function(require,module,exports){
+
+},{"./lib/createEvent.js":2,"./lib/domController.js":3,"./lib/kinetic.js":4,"./lib/svgController.js":5,"./lib/textSelectionInterceptor.js":6,"./lib/transform.js":7,"amator":8,"wheel":10}],2:[function(require,module,exports){
 /* global Event */
 module.exports = createEvent;
 
@@ -927,6 +953,7 @@ function makeSvgController(svgElement) {
     getScreenCTM: getScreenCTM,
     getOwner: getOwner,
     applyTransform: applyTransform,
+    initTransform: initTransform
   }
   
   return api
@@ -947,6 +974,14 @@ function makeSvgController(svgElement) {
 
   function getScreenCTM() {
     return owner.getScreenCTM()
+  }
+
+  function initTransform(transform) {
+    var screenCTM = svgElement.getScreenCTM()
+    transform.x = screenCTM.e;
+    transform.y = screenCTM.f;
+    transform.scale = screenCTM.a;
+    owner.removeAttributeNS(null, 'viewBox');
   }
 
   function applyTransform(transform) {
@@ -1016,9 +1051,12 @@ var animations = {
 
 
 module.exports = animate;
+module.exports.makeAggregateRaf = makeAggregateRaf;
+module.exports.sharedScheduler = makeAggregateRaf();
+
 
 function animate(source, target, options) {
-  var start= Object.create(null)
+  var start = Object.create(null)
   var diff = Object.create(null)
   options = options || {}
   // We let clients specify their own easing function
@@ -1043,7 +1081,7 @@ function animate(source, target, options) {
     diff[key] = target[key] - source[key]
   })
 
-  var durationInMs = options.duration || 400
+  var durationInMs = typeof options.duration === 'number' ? options.duration : 400
   var durationInFrames = Math.max(1, durationInMs * 0.06) // 0.06 because 60 frames pers 1,000 ms
   var previousAnimationId
   var frame = 0
@@ -1107,6 +1145,51 @@ function timeoutScheduler() {
     cancel: function (id) {
       return clearTimeout(id)
     }
+  }
+}
+
+function makeAggregateRaf() {
+  var frontBuffer = new Set();
+  var backBuffer = new Set();
+  var frameToken = 0;
+
+  return {
+    next: next,
+    cancel: next,
+    clearAll: clearAll
+  }
+
+  function clearAll() {
+    frontBuffer.clear();
+    backBuffer.clear();
+    cancelAnimationFrame(frameToken);
+    frameToken = 0;
+  }
+
+  function next(callback) {
+    backBuffer.add(callback);
+    renderNextFrame();
+  }
+
+  function renderNextFrame() {
+    if (!frameToken) frameToken = requestAnimationFrame(renderFrame);
+  }
+
+  function renderFrame() {
+    frameToken = 0;
+
+    var t = backBuffer;
+    backBuffer = frontBuffer;
+    frontBuffer = t;
+
+    frontBuffer.forEach(function(callback) {
+      callback();
+    });
+    frontBuffer.clear();
+  }
+
+  function cancel(callback) {
+    backBuffer.delete(callback);
   }
 }
 
@@ -1240,7 +1323,7 @@ module.exports.addWheelListener = addWheelListener;
 module.exports.removeWheelListener = removeWheelListener;
 
 
-var prefix = "", _addEventListener, _removeEventListener, onwheel, support;
+var prefix = "", _addEventListener, _removeEventListener,  support;
 
 detectEventModel(typeof window !== 'undefined' && window,
                 typeof document !== 'undefined' && document);
@@ -1252,7 +1335,7 @@ function addWheelListener( elem, callback, useCapture ) {
     if( support == "DOMMouseScroll" ) {
         _addWheelListener( elem, "MozMousePixelScroll", callback, useCapture );
     }
-};
+}
 
 function removeWheelListener( elem, callback, useCapture ) {
     _removeWheelListener( elem, support, callback, useCapture );
@@ -1261,12 +1344,12 @@ function removeWheelListener( elem, callback, useCapture ) {
     if( support == "DOMMouseScroll" ) {
         _removeWheelListener( elem, "MozMousePixelScroll", callback, useCapture );
     }
-};
+}
 
-function _addWheelListener( elem, eventName, callback, useCapture ) {
   // TODO: in theory this anonymous function may result in incorrect
   // unsubscription in some browsers. But in practice, I don't think we should
   // worry too much about it (those browsers are on the way out)
+function _addWheelListener( elem, eventName, callback, useCapture ) {
   elem[ _addEventListener ]( prefix + eventName, support == "wheel" ? callback : function( originalEvent ) {
     !originalEvent && ( originalEvent = window.event );
 
@@ -1278,7 +1361,8 @@ function _addWheelListener( elem, eventName, callback, useCapture ) {
       type: "wheel",
       deltaMode: originalEvent.type == "MozMousePixelScroll" ? 0 : 1,
       deltaX: 0,
-      delatZ: 0,
+      deltaY: 0,
+      deltaZ: 0,
       clientX: originalEvent.clientX,
       clientY: originalEvent.clientY,
       preventDefault: function() {
