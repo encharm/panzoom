@@ -106,6 +106,8 @@ function createPanZoom(domElement, options) {
   }
 
   function showRectangle(rect) {
+    smoothScroll.cancel();
+
     // TODO: this duplicates autocenter. I think autocenter should go.
     var w = owner.clientWidth
     var h = owner.clientHeight
