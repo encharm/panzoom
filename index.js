@@ -340,16 +340,14 @@ function createPanZoom(domElement, options) {
   }
 
   function centerOn(ui) {
-    var parent = ui.ownerSVGElement
-    if (!parent) throw new Error('ui element is required to be within the scene')
-
     var clientRect = ui.getBoundingClientRect()
+
     var cx = clientRect.left + clientRect.width/2
     var cy = clientRect.top + clientRect.height/2
 
-    var container = parent.getBoundingClientRect()
-    var dx = container.width/2 - cx
-    var dy = container.height/2 - cy
+    var container = owner.getBoundingClientRect()    
+    var dx = container.left + container.width/2 - cx
+    var dy = container.top + container.height/2 - cy
 
     internalMoveBy(dx, dy, true)
   }
