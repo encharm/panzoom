@@ -137,18 +137,8 @@ function createPanZoom(domElement, options) {
   }
 
   function transformToScreen(x, y) {
-    if (domController.getScreenCTM) {
-      var parentCTM = domController.getScreenCTM()
-      var parentScaleX = parentCTM.a
-      var parentScaleY = parentCTM.d
-      var parentOffsetX = parentCTM.e
-      var parentOffsetY = parentCTM.f
-      storedCTMResult.x = x * parentScaleX - parentOffsetX
-      storedCTMResult.y = y * parentScaleY - parentOffsetY
-    } else {
-      storedCTMResult.x = x
-      storedCTMResult.y = y
-    }
+    storedCTMResult.x = x
+    storedCTMResult.y = y
 
     return storedCTMResult
   }
@@ -312,14 +302,6 @@ function createPanZoom(domElement, options) {
     var parentOffsetX = 0
     var parentOffsetY = 0
 
-    if (domController.getScreenCTM) {
-      var parentCTM = domController.getScreenCTM()
-      parentScaleX = parentCTM.a
-      parentScaleY = parentCTM.b
-      parentOffsetX = parentCTM.e
-      parentOffsetY = parentCTM.f
-    }
-
     var x = clientX * parentScaleX - parentOffsetX
     var y = clientY * parentScaleY - parentOffsetY
 
@@ -341,11 +323,10 @@ function createPanZoom(domElement, options) {
 
   function centerOn(ui) {
     var clientRect = ui.getBoundingClientRect()
-
     var cx = clientRect.left + clientRect.width/2
     var cy = clientRect.top + clientRect.height/2
 
-    var container = owner.getBoundingClientRect()    
+    var container = owner.getBoundingClientRect()
     var dx = container.left + container.width/2 - cx
     var dy = container.top + container.height/2 - cy
 
