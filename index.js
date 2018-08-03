@@ -143,7 +143,7 @@ function createPanZoom(domElement, options) {
     return storedCTMResult
   }
 
-  function autocenter() {
+  function autocenter(element) {
     var w // width of the parent
     var h // height of the parent
     var left = 0
@@ -160,7 +160,18 @@ function createPanZoom(domElement, options) {
       w = owner.clientWidth
       h = owner.clientHeight
     }
-    var bbox = domController.getBBox()
+    var bbox
+    if(element) {
+      const {
+        x: left,
+        y : top,
+        width,
+        height,
+      } = element.getBBox()
+      bbox = { left, top, width, height }
+    } else {
+      bbox = domController.getBBox()
+    }
     var dh = h/bbox.height
     var dw = w/bbox.width
     var scale = Math.min(dw, dh)
