@@ -158,8 +158,8 @@ function createPanZoom(domElement, options) {
       h = sceneBoundingBox.bottom - sceneBoundingBox.top
     } else {
       // otherwise just use whatever space we have
-      w = owner.clientWidth
-      h = owner.clientHeight
+      w = owner.clientWidth || owner.parentNode.clientWidth // || is a fix for Firefox https://stackoverflow.com/a/13647345
+      h = owner.clientHeight || owner.parentNode.clientHeight
     }
     var bbox
     if(element) {
